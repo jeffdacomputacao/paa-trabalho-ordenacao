@@ -1,106 +1,230 @@
-# ---------------------------------------------------------------
-# UNIVERSIDADE FEDERAL DO PIAUÍ - UFPI
-# DISCIPLINA: PROJETO E ANÁLISE DE ALGORITMOS
-# TRABALHO PRÁTICO - PARTE I
-#
-# Implementação e comparação de algoritmos de ordenação:
-# BubbleSort, InsertionSort, MergeSort, HeapSort e QuickSort.
-# ---------------------------------------------------------------
-
-import time
-import random
-import sys
-
-from bubblesort import bubble_sort
-from insertionsort import insertion_sort
-from mergesort import merge_sort
-from heapsort import heap_sort
-from quicksort import quick_sort
+import tkinter as tk
+from tkinter import ttk, messagebox
+import matplotlib.pyplot as plt
+from funcoes import gerar_lista, executar_comparacao
+from ui import (
+    configurar_estilos,
+    criar_interface_principal,
+    criar_titulo,
+    FrameConfiguracao,
+    FrameAlgoritmos,
+    FrameResultados
+)
 
 
-# Aumenta o limite de recursão para reduzir risco de erro no QuickSort
-sys.setrecursionlimit(300000)
-
-
-def gerar_vetores(tamanho):
-    """
-    Gera os três tipos de entrada exigidos no trabalho:
-    1. vetor crescente;
-    2. vetor decrescente;
-    3. vetor aleatório.
-    """
-
-    crescente = list(range(tamanho))
-    decrescente = list(range(tamanho, 0, -1))
-    aleatorio = random.sample(range(tamanho * 2), tamanho)
-
-    return {
-        "Crescente": crescente,
-        "Decrescente": decrescente,
-        "Aleatório": aleatorio
+class App:
+    ENTRADAS = [100, 1000, 5000] # listas com as entradas para teste
+    TIPOS_ORDENACAO = ["crescente", "decrescente", "aleatoria"]
+    NOMES_ALGORITMOS = {
+        "bubble": "Bubble Sort",
+        "insertion": "Insertion Sort",
+        "mergesort": "Merge Sort",
+        "heapsort": "Heap Sort",
+         "quicksort": "Quick Sort",
     }
 
+    def __init__(self, root): # Inicializar a aplicação
+        self.root = root
+        self.cor_primaria = "#2c3e50"
+        self.janela_grafico = None
+        
+        # Configurar janela
+        self.root.title("Comparador de Algoritmos de Ordenacao")
+        self.root.geometry("900x700")
+        self.root.resizable(True, True)
+        self.root.configure(bg="#f0f0f0")
+        self.root.protocol("WM_DELETE_WINDOW", self.sair_aplicacao)
+        
+        # Configurar estilos
+        configurar_estilos()
+        
+        # Criar interface
+        self.criar_interface()
+    
+    def criar_interface(self):
+        # Frame principal com scroll
+        main_frame = criar_interface_principal(self.root)
+        criar_titulo(main_frame, self.cor_primaria)
+        
+        # Frames de configuração
+        self.config_frame = FrameConfiguracao(main_frame, self.ENTRADAS)
+        self.config_frame.pack(fill=tk.X, pady=10)
+        
+        self.algo_frame = FrameAlgoritmos(main_frame)
+        self.algo_frame.pack(fill=tk.X, pady=10)
+        
+        # Botão executar
+        botoes_frame = ttk.Frame(main_frame)
+        botoes_frame.pack(fill=tk.X, pady=15)
 
-def testar_algoritmo(nome_algoritmo, funcao_algoritmo, vetor, condicao, tamanho):
-    """
-    Executa um algoritmo de ordenação três vezes sobre uma cópia do vetor.
-    Calcula a média do tempo de execução e a média das comparações.
-    """
+        ttk.Button(
+            botoes_frame,
+            text="Executar Testes Automaticos",
+            command=self.avaliacao_comparativa
+        ).pack(side=tk.LEFT, padx=5)
 
-    tempos = []
-    comparacoes_lista = []
+        ttk.Button(
+            botoes_frame,
+            text="Limpar Resultados",
+            command=self.limpar_resultados
+        ).pack(side=tk.LEFT, padx=5)
 
-    for execucao in range(1, 4):
+        ttk.Button(
+            botoes_frame,
+            text="SAIR",
+            command=self.sair_aplicacao
+        ).pack(side=tk.RIGHT, padx=5)
+        
+        # Frame de resultados
+        self.resultado_frame = FrameResultados(main_frame)
+        self.resultado_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+      
+    
+    
+    
+    # Obtem os algoritmos selecionados pelo usuário
+    def algoritmos_selecionados(self):
+        return {
+            "bubble": self.algo_frame.bubble_var.get(),
+            "insertion": self.algo_frame.insertion_var.get(),
+            "mergesort": self.algo_frame.merge_var.get(),
+            "heapsort": self.algo_frame.heapsort_var.get(),
+            "quicksort": self.algo_frame.quicksort_var.get(),
+        }
+    
+    # Avaliação comparativa dos algoritmos selecionados
+    def avaliacao_comparativa(self):
+        self.resultado_frame.limpar() # Limpar resultados anteriores
 
-        # Usa cópia para garantir que cada execução receba o vetor original
-        arr = vetor.copy()
+        algoritmos = self.algoritmos_selecionados()
+        if not any(algoritmos.values()):
+            messagebox.showwarning("Aviso", "Selecione pelo menos um algoritmo!")
+            return
 
-        inicio = time.perf_counter()
-        comparacoes = funcao_algoritmo(arr)
-        fim = time.perf_counter()
+        resultados_automaticos = []
+        self.resultado_frame.inserir("Executando testes automaticos...\n")
+        self.resultado_frame.inserir(f"Entradas: {', '.join(str(t) for t in self.ENTRADAS)}\n")
+        self.resultado_frame.inserir("Tipos de lista: crescente, decrescente e aleatoria\n\n")
+        self.root.update_idletasks()
 
-        tempo = fim - inicio
+        for tamanho in self.ENTRADAS: # Para cada entrada, gerar as listas e executar os algoritmos selecionados
+            resultado_por_tamanho = {
+                "tamanho": tamanho,
+                "tipos": {},
+                "medias": {},
+            }
 
-        # Verificação de segurança: garante que o vetor foi ordenado corretamente
-        if arr != sorted(vetor):
-            raise Exception(f"Erro: {nome_algoritmo} não ordenou corretamente.")
+            self.resultado_frame.inserir(f"Processando entrada {tamanho}...\n") 
+            self.root.update_idletasks()
 
-        tempos.append(tempo)
-        comparacoes_lista.append(comparacoes)
+            for tipo_lista in self.TIPOS_ORDENACAO:
+                lista, erro = gerar_lista(tipo_lista, tamanho)
+                if erro:
+                    messagebox.showerror("Erro", erro)
+                    return
 
-    tempo_medio = sum(tempos) / len(tempos)
-    comparacoes_media = sum(comparacoes_lista) / len(comparacoes_lista)
+                resultados = executar_comparacao(
+                    lista,
+                    executar_bubble=algoritmos["bubble"],
+                    executar_insertion=algoritmos["insertion"],
+                    executar_mergesort=algoritmos["mergesort"],
+                    executar_heapsort=algoritmos["heapsort"],
+                    executar_quicksort=algoritmos["quicksort"]
+                )
+                resultado_por_tamanho["tipos"][tipo_lista] = resultados
 
-    print(
-        f"{nome_algoritmo:15} | "
-        f"Condição: {condicao:11} | "
-        f"Tamanho: {tamanho:6} | "
-        f"Tempo médio: {tempo_medio:.6f}s | "
-        f"Comparações médias: {comparacoes_media:.0f}"
-    )
+            for algoritmo, executar in algoritmos.items():
+                if not executar:
+                    continue
+
+                tempos = [
+                    resultado_por_tamanho["tipos"][tipo][algoritmo]["tempo"]
+                    for tipo in self.TIPOS_ORDENACAO
+                    if algoritmo in resultado_por_tamanho["tipos"][tipo]
+                ]
+                if tempos:
+                    resultado_por_tamanho["medias"][algoritmo] = sum(tempos) / len(tempos)
+
+            resultados_automaticos.append(resultado_por_tamanho)
+
+        self.resultado_frame.limpar()
+        self.resultado_frame.inserir(self.formatar_resultados(resultados_automaticos, algoritmos))
+
+    # Função de apresentação dos resultados
+    def formatar_resultados(self, resultados_automaticos, algoritmos):
+        texto = "=" * 100 + "\n"
+        texto += "AVALIAÇÃO DOS ALGORITMOS DE ORDENACAO\n"
+        texto += "=" * 100 + "\n\n"
+        texto += f"Entradas testadas: {', '.join(str(t) for t in self.ENTRADAS)}\n"
+        texto += "Tipos de lista: Crescente, Decrescente e Aleatoria\n"
+        texto += "Media: tempo medio de execução das três listas de ordenação.\n\n"
+
+        for resultado_tamanho in resultados_automaticos:
+            tamanho = resultado_tamanho["tamanho"]
+            texto += "=" * 100 + "\n"
+            texto += f"ENTRADA: {tamanho} ELEMENTOS\n"
+            texto += "=" * 100 + "\n"
+            texto += f"{'Algoritmo':<18}{'Crescente(s)':>16}{'Decrescente(s)':>18}{'Aleatoria(s)':>18}{'Media(s)':>14}\n"
+            texto += "-" * 100 + "\n"
+
+            for algoritmo, executar in algoritmos.items():
+                if not executar:
+                    continue
+
+                tempos = {}
+                for tipo in self.TIPOS_ORDENACAO:
+                    resultado_algoritmo = resultado_tamanho["tipos"][tipo].get(algoritmo)
+                    tempos[tipo] = resultado_algoritmo["tempo"] if resultado_algoritmo else None
+
+                media = resultado_tamanho["medias"].get(algoritmo)
+                texto += (
+                    f"{self.NOMES_ALGORITMOS[algoritmo]:<18}"
+                    f"{self.formatar_tempo(tempos['crescente']):>16}"
+                    f"{self.formatar_tempo(tempos['decrescente']):>18}"
+                    f"{self.formatar_tempo(tempos['aleatoria']):>16}"
+                    f"{self.formatar_tempo(media):>14}\n"
+                )
+
+            texto += "\n"
+
+        return texto
+
+    @staticmethod
+    def formatar_tempo(tempo):
+        if tempo is None:
+            return "-"
+        return f"{tempo:.6f}"
+    
+    def limpar_resultados(self):
+        self.resultado_frame.limpar()
+        self.config_frame.limpar_entrada_custom()
+    
+    def sair_aplicacao(self):
+        if self.janela_grafico is not None:
+            try:
+                self.janela_grafico.fechar()
+            except tk.TclError:
+                pass
+            self.janela_grafico = None
+
+        for janela in self.root.winfo_children():
+            if isinstance(janela, tk.Toplevel):
+                try:
+                    janela.destroy()
+                except tk.TclError:
+                    pass
+
+        plt.close("all")
+        self.root.quit()
+        self.root.destroy()
+
+
+def inicializar():
+    root = tk.Tk()# Criar a janela principal
+    app = App(root) # Inicializar a aplicação
+    root.mainloop() # Iniciar o loop principal da interface
 
 
 if __name__ == "__main__":
-
-    # Para a primeira entrega, o cronograma pede teste com tamanho pequeno.
-    # O próprio enunciado informa que tamanho 500 é suficiente.
-    tamanho = 500
-
-    vetores = gerar_vetores(tamanho)
-
-    algoritmos = {
-        "Bubble Sort": bubble_sort,
-        "Insertion Sort": insertion_sort,
-        "Merge Sort": merge_sort,
-        "Heap Sort": heap_sort,
-        "Quick Sort": quick_sort
-    }
-
-    print("\nRESULTADOS DOS TESTES - PARTE I\n")
-
-    for condicao, vetor in vetores.items():
-        print(f"\nEntrada: {condicao}")
-        print("-" * 100)
-
-        for nome, funcao in algoritmos.items():
-            testar_algoritmo(nome, funcao, vetor, condicao, tamanho)
+    inicializar() #
